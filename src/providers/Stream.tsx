@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { LangGraphLogoSVG } from "@/components/icons/langgraph";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, LoaderCircle } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
 import { getApiKey } from "@/lib/api-key";
 import {
@@ -199,6 +199,11 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
   // zur Lebensdauer der Server-Session (24h-TTL, siehe proxy_sessions).
   const [urlToken, setUrlToken] = useQueryState("token");
   const [sessionToken, setSessionTokenState] = useState<string | null>(null);
+  // Bis der Token-Ursprung (URL vs. sessionStorage) einmal aufgelöst ist,
+  // wird weder Chat noch „nicht eingeloggt" gerendert — sonst würde beim
+  // frischen Einstieg (?token=... in der URL) kurz der Logout-Screen
+  // aufblitzen bzw. useStream ohne Bearer-Header starten.
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   useEffect(() => {
     if (urlToken) {
@@ -208,6 +213,7 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
     } else {
       setSessionTokenState(getSessionToken());
     }
+    setAuthInitialized(true);
     // Nur beim ersten Mount lesen — urlToken/setUrlToken absichtlich nicht
     // in den Dependencies, sonst würde das eigene setUrlToken(null) einen
     // erneuten Durchlauf auslösen.
@@ -340,6 +346,24 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
     );
   }
 
+  // Solange der Token-Ursprung noch nicht aufgelöst ist: kurzer Ladezustand.
+  if (!authInitialized) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center">
+        <LoaderCircle className="text-muted-foreground size-6 animate-spin" />
+      </div>
+    );
+  }
+
+  // Ohne Session-Token gibt es keinen Zugang. Der Einstieg erfolgt
+  // AUSSCHLIESSLICH über die vom Backend-Skript (get_login_url.py) erzeugte
+  // URL `/?threadId=...&token=...`. Deshalb hier KEIN Login-Button / kein
+  // OAuth, sondern ein klarer „nicht eingeloggt"-Zustand statt des
+  // LangSmith-Setup-Formulars.
+  if (!sessionToken) {
+    return <NotLoggedInScreen />;
+  }
+
   return (
     <StreamSession
       apiKey={apiKey}
@@ -350,6 +374,31 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
     >
       {children}
     </StreamSession>
+  );
+};
+
+const NotLoggedInScreen: React.FC = () => {
+  return (
+    <div className="flex min-h-screen w-full items-center justify-center p-4">
+      <div className="animate-in fade-in-0 zoom-in-95 bg-background flex max-w-md flex-col gap-4 rounded-lg border p-6 shadow-lg">
+        <div className="flex flex-col items-start gap-2">
+          <LangGraphLogoSVG className="h-7" />
+          <h1 className="text-xl font-semibold tracking-tight">
+            Nicht eingeloggt
+          </h1>
+        </div>
+        <p className="text-muted-foreground text-sm">
+          Für den Zugang wird ein persönlicher Login-Link mit gültigem
+          Session-Token benötigt. Öffne die Chat-Oberfläche bitte über deinen
+          Login-Link (Format{" "}
+          <code className="text-xs">/?threadId=…&amp;token=…</code>).
+        </p>
+        <p className="text-muted-foreground text-sm">
+          Der Link wird backend-seitig erzeugt. Falls du keinen hast, wende dich
+          an die Betreuung bzw. erzeuge ihn im PoC über das Login-Skript.
+        </p>
+      </div>
+    </div>
   );
 };
 
