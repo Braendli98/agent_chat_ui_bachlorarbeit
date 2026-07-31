@@ -8,6 +8,8 @@ import { Button } from "../ui/button";
 import { Checkpoint, Message } from "@langchain/langgraph-sdk";
 import { AssistantMessage, AssistantMessageLoading } from "./messages/ai";
 import { HumanMessage } from "./messages/human";
+import { PlanChangeInterrupt } from "./messages/plan-change-interrupt";
+import { isPlanChangeInterruptValue } from "@/lib/plan-change-interrupt";
 import {
   DO_NOT_RENDER_ID_PREFIX,
   ensureToolCallsHaveResponses,
@@ -141,6 +143,12 @@ export function Thread() {
   const stream = useStreamContext();
   const messages = stream.messages;
   const isLoading = stream.isLoading;
+
+  // Genau EIN Interrupt-Typ im System: die Planänderungs-Bestätigung.
+  // Solange der Graph darauf wartet, ersetzt die Ja/Nein-Karte den Chat-Input.
+  const planChangeInterrupt = isPlanChangeInterruptValue(stream.interrupt?.value)
+    ? stream.interrupt.value
+    : null;
 
   const lastError = useRef<string | undefined>(undefined);
 
@@ -445,6 +453,9 @@ export function Thread() {
 
                   <ScrollToBottom className="animate-in fade-in-0 zoom-in-95 absolute bottom-full left-1/2 mb-4 -translate-x-1/2" />
 
+                  {planChangeInterrupt ? (
+                    <PlanChangeInterrupt value={planChangeInterrupt} />
+                  ) : (
                   <div
                     ref={dropRef}
                     className={cn(
@@ -540,6 +551,7 @@ export function Thread() {
                       </div>
                     </form>
                   </div>
+                  )}
                 </div>
               }
             />

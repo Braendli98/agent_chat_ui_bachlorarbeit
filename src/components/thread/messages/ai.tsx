@@ -10,6 +10,7 @@ import { ToolCalls, ToolResult } from "./tool-calls";
 import { MessageContentComplex } from "@langchain/core/messages";
 import { Fragment } from "react/jsx-runtime";
 import { isAgentInboxInterruptSchema } from "@/lib/agent-inbox-interrupt";
+import { isPlanChangeInterruptValue } from "@/lib/plan-change-interrupt";
 import { ThreadView } from "../agent-inbox";
 import { useQueryState, parseAsBoolean } from "nuqs";
 import { GenericInterruptView } from "./generic-interrupt";
@@ -82,6 +83,13 @@ function Interrupt({
     ? (interrupt as Record<string, any>[])
     : (((interrupt as { value?: unknown } | undefined)?.value ??
         interrupt) as Record<string, any>);
+
+  // Die Planänderungs-Bestätigung wird als eigene Ja/Nein-Karte am Chat-Input
+  // gerendert (siehe thread/index.tsx). Hier NICHT zusätzlich als generische
+  // Read-only-Ansicht zeigen, sonst erschiene der Plan doppelt.
+  if (isPlanChangeInterruptValue((interrupt as { value?: unknown })?.value)) {
+    return null;
+  }
 
   return (
     <>
