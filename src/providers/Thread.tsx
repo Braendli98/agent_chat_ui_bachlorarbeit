@@ -1,5 +1,6 @@
 import { validate } from "uuid";
 import { getApiKey } from "@/lib/api-key";
+import { getSessionToken } from "@/lib/session-token";
 import { Thread } from "@langchain/langgraph-sdk";
 import { useQueryState } from "nuqs";
 import {
@@ -56,6 +57,7 @@ export function ThreadProvider({ children }: { children: ReactNode }) {
       apiUrl,
       getApiKey() ?? undefined,
       authScheme || undefined,
+      getSessionToken(),
     );
 
     const threads = await client.threads.search({

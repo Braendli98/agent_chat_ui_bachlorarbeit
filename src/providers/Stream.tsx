@@ -23,6 +23,10 @@ import { Switch } from "@/components/ui/switch";
 import { ArrowRight } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
 import { getApiKey } from "@/lib/api-key";
+import {
+  getSessionToken,
+  setSessionToken,
+} from "@/lib/session-token";
 import { useThreads } from "./Thread";
 import { toast } from "sonner";
 
@@ -74,24 +78,31 @@ const StreamSession = ({
   apiUrl,
   assistantId,
   authScheme,
+  sessionToken,
 }: {
   children: ReactNode;
   apiKey: string | null;
   apiUrl: string;
   assistantId: string;
   authScheme?: string;
+  sessionToken?: string | null;
 }) => {
   const [threadId, setThreadId] = useQueryState("threadId");
   const { getThreads, setThreads } = useThreads();
+  // Header-Merge: X-Auth-Scheme (bestehender LangSmith/Agent-Builder-Weg)
+  // und Authentication (unser eigener Bearer-Token vom Trusted Proxy)
+  // können grundsätzlich gleichzeitig gesetzt sein — beide landen in
+  // EINEM defaultHeaders-Objekt statt in zwei separaten bedingten Spreads,
+  // sonst würde der zweite den ersten überschreiben statt zu ergänzen.
+  const defaultHeaders: Record<string, string> = {};
+  if (authScheme) defaultHeaders["X-Auth-Scheme"] = authScheme;
+  if (sessionToken) defaultHeaders["Authentication"] = `Bearer ${sessionToken}`;
+
   const streamValue = useTypedStream({
     apiUrl,
     apiKey: apiKey ?? undefined,
     assistantId,
-    ...(authScheme && {
-      defaultHeaders: {
-        "X-Auth-Scheme": authScheme,
-      },
-    }),
+    ...(Object.keys(defaultHeaders).length > 0 && { defaultHeaders }),
     threadId: threadId ?? null,
     fetchStateHistory: true,
     onCustomEvent: (event, options) => {
@@ -175,6 +186,33 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
     window.localStorage.setItem("lg:chat:apiKey", key);
     _setApiKey(key);
   };
+
+  // ── Access-Token vom Trusted Proxy ──────────────────────────────────
+  //
+  // Kommt per Redirect vom Login-Flow (/session/start → Redirect auf
+  // `<agent-chat-ui>/?threadId=...&token=...`). Wird NUR EINMAL aus der
+  // URL gelesen und sofort wieder entfernt (setToken(null) löscht den
+  // Query-Param) — ein Bearer-Token darf nicht dauerhaft in der Adress-
+  // zeile/Browser-Historie stehen bleiben. Der Wert selbst landet in
+  // sessionStorage (siehe lib/session-token.tsx), damit er Reloads
+  // innerhalb desselben Tabs übersteht, aber mit dem Tab endet — passend
+  // zur Lebensdauer der Server-Session (24h-TTL, siehe proxy_sessions).
+  const [urlToken, setUrlToken] = useQueryState("token");
+  const [sessionToken, setSessionTokenState] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (urlToken) {
+      setSessionToken(urlToken);
+      setSessionTokenState(urlToken);
+      setUrlToken(null);
+    } else {
+      setSessionTokenState(getSessionToken());
+    }
+    // Nur beim ersten Mount lesen — urlToken/setUrlToken absichtlich nicht
+    // in den Dependencies, sonst würde das eigene setUrlToken(null) einen
+    // erneuten Durchlauf auslösen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Determine final values to use, prioritizing URL params then env vars
   const finalApiUrl = apiUrl || envApiUrl;
@@ -308,6 +346,7 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
       apiUrl={finalApiUrl}
       assistantId={finalAssistantId}
       authScheme={finalAuthScheme || undefined}
+      sessionToken={sessionToken}
     >
       {children}
     </StreamSession>
