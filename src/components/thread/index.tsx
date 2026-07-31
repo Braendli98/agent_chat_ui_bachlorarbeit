@@ -11,6 +11,7 @@ import { HumanMessage } from "./messages/human";
 import { PlanChangeInterrupt } from "./messages/plan-change-interrupt";
 import { isPlanChangeInterruptValue } from "@/lib/plan-change-interrupt";
 import { AiDisclosure } from "./ai-disclosure";
+import { ExcelDownload } from "./excel-download";
 import {
   DO_NOT_RENDER_ID_PREFIX,
   ensureToolCallsHaveResponses,
@@ -144,6 +145,19 @@ export function Thread() {
   const stream = useStreamContext();
   const messages = stream.messages;
   const isLoading = stream.isLoading;
+
+  // Thread-State (nicht an eine Nachricht gebunden): sobald das Backend eine
+  // Excel erzeugt hat, steht hier ihr Dateiname und die Download-Karte
+  // erscheint am Ende des Verlaufs.
+  //
+  // WICHTIG — reaktiv, nicht einmalig: Das Backend LEERT das Feld wieder, sobald
+  // die Datei nicht mehr zum Plan passt (bestätigte Planänderung,
+  // Präferenzkorrektur, Horizontwechsel, bestätigter Neustart). Dann muss die
+  // Karte verschwinden, sonst lieferte der Download stillschweigend die alte
+  // Datei — der Dateiname trägt einen Inhalts-Hash, die alte Datei existiert
+  // also noch und es gäbe nicht einmal einen 404. Der Chat erklärt jeweils in
+  // einem Satz, warum die Datei weg ist.
+  const excelDateiname = stream.values?.excel_dateiname;
 
   // Genau EIN Interrupt-Typ im System: die Planänderungs-Bestätigung.
   // Solange der Graph darauf wartet, ersetzt die Ja/Nein-Karte den Chat-Input.
@@ -435,6 +449,9 @@ export function Thread() {
                       isLoading={isLoading}
                       handleRegenerate={handleRegenerate}
                     />
+                  )}
+                  {excelDateiname && (
+                    <ExcelDownload dateiname={excelDateiname} />
                   )}
                   {isLoading && !firstTokenReceived && (
                     <AssistantMessageLoading />

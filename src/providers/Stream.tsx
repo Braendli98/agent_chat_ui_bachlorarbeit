@@ -30,7 +30,15 @@ import {
 import { useThreads } from "./Thread";
 import { toast } from "sonner";
 
-export type StateType = { messages: Message[]; ui?: UIMessage[] };
+export type StateType = {
+  messages: Message[];
+  ui?: UIMessage[];
+  // Nur der Dateiname (z.B. "studienplan_ws25.xlsx"), KEIN Serverpfad — der
+  // frühere Pfad im Nachrichtentext war für Studierende ohnehin nicht öffenbar.
+  // Ist das Feld gesetzt, rendert der Chatverlauf eine Download-Karte, die die
+  // Datei über GET /threads/{threadId}/excel holt (siehe lib/excel-download.ts).
+  excel_dateiname?: string;
+};
 
 const useTypedStream = useStream<
   StateType,
