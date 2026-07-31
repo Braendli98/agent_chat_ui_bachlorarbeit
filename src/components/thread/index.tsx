@@ -10,6 +10,7 @@ import { AssistantMessage, AssistantMessageLoading } from "./messages/ai";
 import { HumanMessage } from "./messages/human";
 import { PlanChangeInterrupt } from "./messages/plan-change-interrupt";
 import { isPlanChangeInterruptValue } from "@/lib/plan-change-interrupt";
+import { AiDisclosure } from "./ai-disclosure";
 import {
   DO_NOT_RENDER_ID_PREFIX,
   ensureToolCallsHaveResponses,
@@ -552,6 +553,7 @@ export function Thread() {
                     </form>
                   </div>
                   )}
+                  <AiDisclosure />
                 </div>
               }
             />
